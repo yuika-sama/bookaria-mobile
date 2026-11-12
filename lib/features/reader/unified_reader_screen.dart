@@ -1125,77 +1125,21 @@ class _UnifiedReaderScreenState extends ConsumerState<UnifiedReaderScreen> {
   Future<void> _openReportDialog() async {
     final slug = widget.slug;
     if (slug == null) return;
-    ReportReason selected = ReportReason.inappropriate;
-    final noteController = TextEditingController();
 
-    final confirmed = await showDialog<bool>(
+    final submission = await showDialog<({ReportReason reason, String note})>(
       context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) => AlertDialog(
-            title: const Text('Báo cáo nội dung'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  RadioGroup<ReportReason>(
-                    groupValue: selected,
-                    onChanged: (val) {
-                      if (val != null) {
-                        setDialogState(() => selected = val);
-                      }
-                    },
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        for (final reason in ReportReason.values)
-                          RadioListTile<ReportReason>(
-                            contentPadding: EdgeInsets.zero,
-                            value: reason,
-                            title: Text(reason.labelVi),
-                          ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: noteController,
-                    maxLines: 3,
-                    maxLength: 500,
-                    decoration: const InputDecoration(
-                      labelText: 'Ghi chú thêm (không bắt buộc)',
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(false),
-                child: const Text('Hủy'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(dialogContext).pop(true),
-                child: const Text('Gửi báo cáo'),
-              ),
-            ],
-          ),
-        );
-      },
+      builder: (_) => const _ReportBookDialog(),
     );
 
-    final note = noteController.text;
-    noteController.dispose();
-
-    if (confirmed != true) return;
+    if (submission == null) return;
     try {
       final eventsService = ref.read(readingEventsServiceProvider);
       final deviceId = await eventsService.getOrCreateReportDeviceId();
       await ref.read(bookariaApiClientProvider).reportBook(
             slug,
             ReportBookBody(
-              reason: selected,
-              note: note,
+              reason: submission.reason,
+              note: submission.note,
               pageId: _currentPage?.pageId,
               deviceId: deviceId,
             ),
@@ -1749,6 +1693,78 @@ class _ReaderStageCard extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+class _ReportBookDialog extends StatefulWidget {
+  const _ReportBookDialog();
+
+  @override
+  State<_ReportBookDialog> createState() => _ReportBookDialogState();
+}
+
+class _ReportBookDialogState extends State<_ReportBookDialog> {
+  final TextEditingController _noteController = TextEditingController();
+  ReportReason _selected = ReportReason.inappropriate;
+
+  @override
+  void dispose() {
+    _noteController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Báo cáo nội dung'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RadioGroup<ReportReason>(
+              groupValue: _selected,
+              onChanged: (val) {
+                if (val != null) {
+                  setState(() => _selected = val);
+                }
+              },
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final reason in ReportReason.values)
+                    RadioListTile<ReportReason>(
+                      contentPadding: EdgeInsets.zero,
+                      value: reason,
+                      title: Text(reason.labelVi),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _noteController,
+              maxLines: 3,
+              maxLength: 500,
+              decoration: const InputDecoration(
+                labelText: 'Ghi chú thêm (không bắt buộc)',
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Hủy'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(
+            (reason: _selected, note: _noteController.text),
+          ),
+          child: const Text('Gửi báo cáo'),
+        ),
+      ],
     );
   }
 }

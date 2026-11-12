@@ -13,6 +13,7 @@ import 'package:bookaria_mobile/core/storage/offline_storage_paths.dart';
 import 'package:bookaria_mobile/core/telemetry/reading_events_service.dart';
 import 'package:bookaria_mobile/features/explore/book_detail_screen.dart';
 import 'package:bookaria_mobile/features/explore/explore_providers.dart';
+import 'package:bookaria_mobile/features/profile/profile_screen.dart';
 import 'package:bookaria_mobile/features/reader/unified_reader_screen.dart';
 import 'package:bookaria_mobile/features/shelf/shelf_providers.dart';
 import 'package:dio/dio.dart';
@@ -432,6 +433,132 @@ void main() {
 
       expect(find.text('Cập nhật "stars" = 1'), findsOneWidget);
       expect(find.text('stars: 1'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'ProfileScreen PIN verification & change dialogs dispose controllers cleanly after route transitions',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'bookaria.pref.kidMode': true,
+        'bookaria.pref.kidPin': '0000',
+      });
+      final prefs = await SharedPreferences.getInstance();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            sharedPreferencesProvider.overrideWithValue(prefs),
+            appConfigProvider.overrideWithValue(AppConfig.fromEnvironment()),
+            shelfBooksProvider.overrideWith(_NoopShelfNotifier.new),
+          ],
+          child: MaterialApp(
+            theme: buildBookariaTheme(Brightness.light),
+            home: const ProfileScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Wrong PIN keeps Kid Mode enabled
+      await tester.ensureVisible(find.text('Bật Chế độ Trẻ em'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Bật Chế độ Trẻ em'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), '9999');
+      await tester.tap(find.text('Xác nhận'));
+      await tester.pumpAndSettle();
+      expect(find.text('Mã PIN không chính xác.'), findsOneWidget);
+      expect(prefs.getBool('bookaria.pref.kidMode'), isTrue);
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+
+      // Valid PIN turns Kid Mode off
+      await tester.tap(find.text('Bật Chế độ Trẻ em'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), '0000');
+      await tester.tap(find.text('Xác nhận'));
+      await tester.pumpAndSettle();
+      expect(prefs.getBool('bookaria.pref.kidMode'), isFalse);
+
+      // Change PIN: invalid short new PIN shows validation snackbar
+      await tester.ensureVisible(find.text('Đổi mã PIN phụ huynh'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Đổi mã PIN phụ huynh'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).first, '0000');
+      await tester.enterText(find.byType(TextField).last, '12');
+      await tester.tap(find.text('Lưu PIN'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('PIN cũ không khớp hoặc PIN mới dưới 4 ký tự.'),
+        findsOneWidget,
+      );
+      expect(prefs.getString('bookaria.pref.kidPin'), '0000');
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+
+      // Change PIN: valid old + new PIN persists updated PIN cleanly
+      await tester.tap(find.text('Đổi mã PIN phụ huynh'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).first, '0000');
+      await tester.enterText(find.byType(TextField).last, '2468');
+      await tester.tap(find.text('Lưu PIN'));
+      await tester.pumpAndSettle();
+      expect(find.text('Đã cập nhật mã PIN phụ huynh.'), findsOneWidget);
+      expect(prefs.getString('bookaria.pref.kidPin'), '2468');
+    },
+  );
+
+  testWidgets(
+    'BookAccessGuard.promptParentPin handles cancel, wrong PIN, and submit without controller lifecycle errors',
+    (tester) async {
+      bool? lastResult;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildBookariaTheme(Brightness.light),
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => Center(
+                child: ElevatedButton(
+                  onPressed: () async {
+                    lastResult = await BookAccessGuard.promptParentPin(
+                      context,
+                      expectedPin: '4321',
+                      reason: 'Kiểm tra PIN',
+                    );
+                  },
+                  child: const Text('Mở PIN'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // Cancel dialog
+      await tester.tap(find.text('Mở PIN'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Đóng'));
+      await tester.pumpAndSettle();
+      expect(lastResult, isFalse);
+
+      // Wrong PIN
+      await tester.tap(find.text('Mở PIN'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), '0000');
+      await tester.tap(find.text('Mở khóa'));
+      await tester.pumpAndSettle();
+      expect(lastResult, isFalse);
+      expect(find.text('Mã PIN phụ huynh không chính xác.'), findsOneWidget);
+
+      // Correct PIN via keyboard submit
+      await tester.tap(find.text('Mở PIN'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), '4321');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+      expect(lastResult, isTrue);
     },
   );
 }

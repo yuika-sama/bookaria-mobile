@@ -86,52 +86,12 @@ class _QuickScannerScreenState extends ConsumerState<QuickScannerScreen> {
   }
 
   Future<void> _openManualInputSheet() async {
-    final textController = TextEditingController();
     final submitted = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (sheetContext) {
-        return Padding(
-          padding: EdgeInsets.fromLTRB(
-            20,
-            20,
-            20,
-            MediaQuery.of(sheetContext).viewInsets.bottom + 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Nhập liên kết hoặc mã sách',
-                style: Theme.of(sheetContext).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Hỗ trợ URL (/b/:slug, /preview/:token), mã preview 32 ký tự hoặc slug sách.',
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: textController,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  hintText: 'Ví dụ: vuon-co-tich hoặc https://.../b/vuon-co-tich',
-                ),
-                onSubmitted: (val) => Navigator.of(sheetContext).pop(val),
-              ),
-              const SizedBox(height: 14),
-              FilledButton(
-                onPressed: () =>
-                    Navigator.of(sheetContext).pop(textController.text),
-                child: const Text('Mở sách'),
-              ),
-            ],
-          ),
-        );
-      },
+      builder: (_) => const _ManualBookInputSheet(),
     );
-    textController.dispose();
     if (submitted != null && submitted.trim().isNotEmpty) {
       await _handleRawCode(submitted);
     }
@@ -258,6 +218,67 @@ class _QuickScannerScreenState extends ConsumerState<QuickScannerScreen> {
                 ],
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ManualBookInputSheet extends StatefulWidget {
+  const _ManualBookInputSheet();
+
+  @override
+  State<_ManualBookInputSheet> createState() => _ManualBookInputSheetState();
+}
+
+class _ManualBookInputSheetState extends State<_ManualBookInputSheet> {
+  final TextEditingController _textController = TextEditingController();
+
+  @override
+  void dispose() {
+    _textController.dispose();
+    super.dispose();
+  }
+
+  void _submit([String? rawValue]) {
+    Navigator.of(context).pop(rawValue ?? _textController.text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        20,
+        20,
+        MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Nhập liên kết hoặc mã sách',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Hỗ trợ URL (/b/:slug, /preview/:token), mã preview 32 ký tự hoặc slug sách.',
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _textController,
+            autofocus: true,
+            decoration: const InputDecoration(
+              hintText: 'Ví dụ: vuon-co-tich hoặc https://.../b/vuon-co-tich',
+            ),
+            onSubmitted: _submit,
+          ),
+          const SizedBox(height: 14),
+          FilledButton(
+            onPressed: () => _submit(),
+            child: const Text('Mở sách'),
           ),
         ],
       ),

@@ -240,35 +240,10 @@ class ProfileScreen extends ConsumerWidget {
     }
 
     // Turning Kid Mode OFF requires parent PIN verification
-    final pinController = TextEditingController();
     final verified = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Xác nhận mã PIN phụ huynh'),
-        content: TextField(
-          controller: pinController,
-          keyboardType: TextInputType.number,
-          obscureText: true,
-          maxLength: 6,
-          decoration: const InputDecoration(
-            labelText: 'Nhập mã PIN (mặc định 0000)',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Hủy'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(
-              pinController.text.trim() == prefs.kidPin,
-            ),
-            child: const Text('Xác nhận'),
-          ),
-        ],
-      ),
+      builder: (_) => _VerifyPinDialog(expectedPin: prefs.kidPin),
     );
-    pinController.dispose();
 
     if (verified == true) {
       await ref
@@ -286,59 +261,10 @@ class ProfileScreen extends ConsumerWidget {
     WidgetRef ref,
     AppPreferencesState prefs,
   ) async {
-    final oldPinController = TextEditingController();
-    final newPinController = TextEditingController();
-
     final newPin = await showDialog<String>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Đổi mã PIN phụ huynh'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: oldPinController,
-              keyboardType: TextInputType.number,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'Mã PIN hiện tại',
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: newPinController,
-              keyboardType: TextInputType.number,
-              obscureText: true,
-              maxLength: 6,
-              decoration: const InputDecoration(
-                labelText: 'Mã PIN mới (4–6 số)',
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Hủy'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final oldMatch = oldPinController.text.trim() == prefs.kidPin;
-              final next = newPinController.text.trim();
-              if (!oldMatch || next.length < 4) {
-                Navigator.of(dialogContext).pop('');
-                return;
-              }
-              Navigator.of(dialogContext).pop(next);
-            },
-            child: const Text('Lưu PIN'),
-          ),
-        ],
-      ),
+      builder: (_) => _ChangePinDialog(expectedPin: prefs.kidPin),
     );
-
-    oldPinController.dispose();
-    newPinController.dispose();
 
     if (newPin == null) return;
     if (newPin.isEmpty) {
@@ -361,5 +287,128 @@ class ProfileScreen extends ConsumerWidget {
         const SnackBar(content: Text('Đã cập nhật mã PIN phụ huynh.')),
       );
     }
+  }
+}
+
+class _VerifyPinDialog extends StatefulWidget {
+  const _VerifyPinDialog({required this.expectedPin});
+
+  final String expectedPin;
+
+  @override
+  State<_VerifyPinDialog> createState() => _VerifyPinDialogState();
+}
+
+class _VerifyPinDialogState extends State<_VerifyPinDialog> {
+  final TextEditingController _pinController = TextEditingController();
+
+  @override
+  void dispose() {
+    _pinController.dispose();
+    super.dispose();
+  }
+
+  void _confirm([String? rawValue]) {
+    final entered = (rawValue ?? _pinController.text).trim();
+    Navigator.of(context).pop(entered == widget.expectedPin);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Xác nhận mã PIN phụ huynh'),
+      content: TextField(
+        controller: _pinController,
+        keyboardType: TextInputType.number,
+        obscureText: true,
+        maxLength: 6,
+        decoration: const InputDecoration(
+          labelText: 'Nhập mã PIN (mặc định 0000)',
+        ),
+        onSubmitted: _confirm,
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Hủy'),
+        ),
+        FilledButton(
+          onPressed: () => _confirm(),
+          child: const Text('Xác nhận'),
+        ),
+      ],
+    );
+  }
+}
+
+class _ChangePinDialog extends StatefulWidget {
+  const _ChangePinDialog({required this.expectedPin});
+
+  final String expectedPin;
+
+  @override
+  State<_ChangePinDialog> createState() => _ChangePinDialogState();
+}
+
+class _ChangePinDialogState extends State<_ChangePinDialog> {
+  final TextEditingController _oldPinController = TextEditingController();
+  final TextEditingController _newPinController = TextEditingController();
+
+  @override
+  void dispose() {
+    _oldPinController.dispose();
+    _newPinController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final oldMatch = _oldPinController.text.trim() == widget.expectedPin;
+    final next = _newPinController.text.trim();
+    if (!oldMatch || next.length < 4) {
+      Navigator.of(context).pop('');
+      return;
+    }
+    Navigator.of(context).pop(next);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Đổi mã PIN phụ huynh'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _oldPinController,
+            keyboardType: TextInputType.number,
+            obscureText: true,
+            decoration: const InputDecoration(
+              labelText: 'Mã PIN hiện tại',
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _newPinController,
+            keyboardType: TextInputType.number,
+            obscureText: true,
+            maxLength: 6,
+            decoration: const InputDecoration(
+              labelText: 'Mã PIN mới (4–6 số)',
+            ),
+            onSubmitted: (_) => _submit(),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Hủy'),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: const Text('Lưu PIN'),
+        ),
+      ],
+    );
   }
 }
