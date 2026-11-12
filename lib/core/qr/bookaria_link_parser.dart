@@ -12,6 +12,15 @@ class PublishedBookTarget extends BookariaLinkTarget {
   final String slug;
   final int? page;
   final bool startInAr;
+
+  String toAppLocation() {
+    final params = <String, String>{};
+    if (page != null) params['page'] = '$page';
+    if (startInAr) params['mode'] = 'ar';
+    final query =
+        params.isEmpty ? '' : '?${Uri(queryParameters: params).query}';
+    return '/reader/book/${Uri.encodeComponent(slug)}$query';
+  }
 }
 
 class PreviewBookTarget extends BookariaLinkTarget {
@@ -24,6 +33,15 @@ class PreviewBookTarget extends BookariaLinkTarget {
   final String token;
   final int? page;
   final bool startInAr;
+
+  String toAppLocation() {
+    final params = <String, String>{};
+    if (page != null) params['page'] = '$page';
+    if (startInAr) params['mode'] = 'ar';
+    final query =
+        params.isEmpty ? '' : '?${Uri(queryParameters: params).query}';
+    return '/reader/preview/${Uri.encodeComponent(token)}$query';
+  }
 }
 
 class InvalidBookariaLink extends BookariaLinkTarget {
@@ -57,19 +75,51 @@ class BookariaLinkParser {
     }
 
     final uri = Uri.tryParse(trimmed);
-    if (uri == null || uri.pathSegments.isEmpty) {
+    if (uri == null) {
       return const InvalidBookariaLink(
         'Mã QR hoặc liên kết không phải định dạng của Bookaria.',
       );
     }
 
-    final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
-    if (segments.length >= 2 && segments[0] == 'b') {
-      final slug = segments[1];
+    if (uri.hasScheme) {
+      final scheme = uri.scheme.toLowerCase();
+      if (scheme != 'http' && scheme != 'https' && scheme != 'bookaria') {
+        return const InvalidBookariaLink(
+          'Giao thức liên kết không được Bookaria hỗ trợ.',
+        );
+      }
+    }
+
+    final rawSegments = <String>[
+      if (uri.scheme.toLowerCase() == 'bookaria' &&
+          (uri.host == 'b' || uri.host == 'preview'))
+        uri.host,
+      ...uri.pathSegments.where((s) => s.isNotEmpty),
+    ];
+
+    if (rawSegments.isEmpty) {
+      return const InvalidBookariaLink(
+        'Mã QR hoặc liên kết không phải định dạng của Bookaria.',
+      );
+    }
+
+    final queryModeAr =
+        uri.queryParameters['mode']?.trim().toLowerCase() == 'ar';
+    final queryPage = _positiveInt(uri.queryParameters['page'] ?? '');
+
+    if (rawSegments.length >= 2 && rawSegments[0] == 'b') {
+      final slug = rawSegments[1];
       if (!isValidSlug(slug)) {
         return const InvalidBookariaLink('Slug sách không hợp lệ.');
       }
-      final parsed = _parseSubSegments(segments.sublist(2));
+      final parsed = _parseSubSegments(
+        rawSegments.sublist(2),
+        queryPage: queryPage,
+        queryModeAr: queryModeAr,
+      );
+      if (parsed == null) {
+        return const InvalidBookariaLink('Đường dẫn trang sách không hợp lệ.');
+      }
       return PublishedBookTarget(
         slug: slug,
         page: parsed.page,
@@ -77,12 +127,21 @@ class BookariaLinkParser {
       );
     }
 
-    if (segments.length >= 2 && segments[0] == 'preview') {
-      final token = segments[1];
+    if (rawSegments.length >= 2 && rawSegments[0] == 'preview') {
+      final token = rawSegments[1];
       if (!isValidPreviewToken(token)) {
         return const InvalidBookariaLink('Mã xem trước không hợp lệ.');
       }
-      final parsed = _parseSubSegments(segments.sublist(2));
+      final parsed = _parseSubSegments(
+        rawSegments.sublist(2),
+        queryPage: queryPage,
+        queryModeAr: queryModeAr,
+      );
+      if (parsed == null) {
+        return const InvalidBookariaLink(
+          'Đường dẫn xem trước không hợp lệ.',
+        );
+      }
       return PreviewBookTarget(
         token: token,
         page: parsed.page,
@@ -95,21 +154,35 @@ class BookariaLinkParser {
     );
   }
 
-  static ({int? page, bool startInAr}) _parseSubSegments(List<String> tail) {
-    if (tail.isEmpty) return (page: null, startInAr: false);
-    if (tail[0] == 'p' && tail.length >= 2) {
-      return (page: _positiveInt(tail[1]), startInAr: false);
+  static ({int? page, bool startInAr})? _parseSubSegments(
+    List<String> tail, {
+    int? queryPage,
+    bool queryModeAr = false,
+  }) {
+    if (tail.isEmpty) {
+      return (page: queryPage, startInAr: queryModeAr);
     }
-    if (tail[0] == 'ar' || tail[0] == 'camera') {
-      final page =
-          (tail.length >= 3 && tail[1] == 'p') ? _positiveInt(tail[2]) : null;
+    if (tail.length == 1 && tail[0] == 'read') {
+      return (page: queryPage ?? 1, startInAr: false);
+    }
+    if (tail.length == 2 && tail[0] == 'p') {
+      final page = _positiveInt(tail[1]);
+      if (page == null) return null;
+      return (page: page, startInAr: queryModeAr);
+    }
+    if (tail.length == 1 && (tail[0] == 'ar' || tail[0] == 'camera')) {
+      return (page: queryPage, startInAr: true);
+    }
+    if (tail.length == 3 && tail[0] == 'ar' && tail[1] == 'p') {
+      final page = _positiveInt(tail[2]);
+      if (page == null) return null;
       return (page: page, startInAr: true);
     }
-    return (page: null, startInAr: false);
+    return null;
   }
 
   static int? _positiveInt(String raw) {
-    final n = int.tryParse(raw);
+    final n = int.tryParse(raw.trim());
     return (n != null && n > 0) ? n : null;
   }
 }

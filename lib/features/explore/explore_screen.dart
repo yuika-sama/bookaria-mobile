@@ -117,31 +117,38 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                 const SizedBox(width: 12),
                 _AgeChip(
                   label: 'Mọi tuổi',
-                  selected: filter.age == null,
+                  selected: filter.age == null ||
+                      (prefs.kidModeEnabled && filter.age! > prefs.kidMaxAge),
                   onSelected: () =>
                       ref.read(exploreFilterProvider.notifier).setAge(null),
                 ),
-                const SizedBox(width: 8),
-                _AgeChip(
-                  label: '4+ tuổi',
-                  selected: filter.age == 4,
-                  onSelected: () =>
-                      ref.read(exploreFilterProvider.notifier).setAge(4),
-                ),
-                const SizedBox(width: 8),
-                _AgeChip(
-                  label: '7+ tuổi',
-                  selected: filter.age == 7,
-                  onSelected: () =>
-                      ref.read(exploreFilterProvider.notifier).setAge(7),
-                ),
-                const SizedBox(width: 8),
-                _AgeChip(
-                  label: '10+ tuổi',
-                  selected: filter.age == 10,
-                  onSelected: () =>
-                      ref.read(exploreFilterProvider.notifier).setAge(10),
-                ),
+                if (!prefs.kidModeEnabled || 4 <= prefs.kidMaxAge) ...[
+                  const SizedBox(width: 8),
+                  _AgeChip(
+                    label: '4+ tuổi',
+                    selected: filter.age == 4,
+                    onSelected: () =>
+                        ref.read(exploreFilterProvider.notifier).setAge(4),
+                  ),
+                ],
+                if (!prefs.kidModeEnabled || 7 <= prefs.kidMaxAge) ...[
+                  const SizedBox(width: 8),
+                  _AgeChip(
+                    label: '7+ tuổi',
+                    selected: filter.age == 7,
+                    onSelected: () =>
+                        ref.read(exploreFilterProvider.notifier).setAge(7),
+                  ),
+                ],
+                if (!prefs.kidModeEnabled || 10 <= prefs.kidMaxAge) ...[
+                  const SizedBox(width: 8),
+                  _AgeChip(
+                    label: '10+ tuổi',
+                    selected: filter.age == 10,
+                    onSelected: () =>
+                        ref.read(exploreFilterProvider.notifier).setAge(10),
+                  ),
+                ],
               ],
             ),
           ),

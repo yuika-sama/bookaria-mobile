@@ -5,8 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import '../../app/book_access_guard.dart';
 import '../../core/haptics/haptics_service.dart';
+import '../../core/network/api_client.dart';
+import '../../core/preferences/app_preferences.dart';
 import '../../core/qr/bookaria_link_parser.dart';
+import '../../core/storage/app_database.dart';
 
 class QuickScannerScreen extends ConsumerStatefulWidget {
   const QuickScannerScreen({super.key});
@@ -39,30 +43,34 @@ class _QuickScannerScreenState extends ConsumerState<QuickScannerScreen> {
     final target = BookariaLinkParser.parse(rawValue);
 
     switch (target) {
-      case PublishedBookTarget(:final slug, :final page, :final startInAr):
+      case PublishedBookTarget():
+      case PreviewBookTarget():
         _navigated = true;
         await ref.read(hapticsServiceProvider).medium();
-        final params = <String, String>{};
-        if (page != null) params['page'] = '$page';
-        if (startInAr) params['mode'] = 'ar';
-        final query = params.isEmpty
-            ? ''
-            : '?${Uri(queryParameters: params).query}';
-        if (mounted) {
-          context.pushReplacement('/reader/book/$slug$query');
+        if (!mounted) {
+          _navigated = false;
+          return;
         }
-      case PreviewBookTarget(:final token, :final page, :final startInAr):
-        _navigated = true;
-        await ref.read(hapticsServiceProvider).medium();
-        final params = <String, String>{};
-        if (page != null) params['page'] = '$page';
-        if (startInAr) params['mode'] = 'ar';
-        final query = params.isEmpty
-            ? ''
-            : '?${Uri(queryParameters: params).query}';
-        if (mounted) {
-          context.pushReplacement('/reader/preview/$token$query');
+        final decision = await BookAccessGuard.authorizeTarget(
+          context,
+          prefs: ref.read(appPreferencesProvider),
+          db: ref.read(appDatabaseProvider),
+          api: ref.read(bookariaApiClientProvider),
+          target: target,
+        );
+        if (!decision.allowed || !mounted) {
+          _navigated = false;
+          return;
         }
+        final location = target is PublishedBookTarget
+            ? target.toAppLocation()
+            : (target as PreviewBookTarget).toAppLocation();
+        context.pushReplacement(
+          location,
+          extra: decision.verifiedByParentPin
+              ? const ReaderRouteExtra(parentPinVerified: true)
+              : null,
+        );
       case InvalidBookariaLink(:final reason):
         final now = DateTime.now();
         if (_lastErrorSnackAt == null ||

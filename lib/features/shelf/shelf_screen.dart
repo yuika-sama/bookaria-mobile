@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../app/book_access_guard.dart';
 import '../../app/theme.dart';
+import '../../core/preferences/app_preferences.dart';
 import '../../core/storage/app_database.dart';
 import '../../core/utils/formatters.dart';
 import '../offline_pack/offline_pack_manager.dart';
@@ -14,9 +16,33 @@ import 'shelf_providers.dart';
 class ShelfScreen extends ConsumerWidget {
   const ShelfScreen({super.key});
 
+  Future<void> _openOfflineBook(
+    BuildContext context,
+    AppPreferencesState prefs,
+    OfflineBookRecord record, {
+    bool ar = false,
+  }) async {
+    final decision = await BookAccessGuard.authorizeKnownBook(
+      context,
+      prefs: prefs,
+      ageMin: record.ageMin,
+      title: record.title,
+    );
+    if (!decision.allowed || !context.mounted) return;
+    final page = record.lastPageIndex + 1;
+    final modeParam = ar ? '&mode=ar' : '';
+    await context.push(
+      '/reader/book/${record.slug}?page=$page$modeParam',
+      extra: decision.verifiedByParentPin
+          ? const ReaderRouteExtra(parentPinVerified: true)
+          : null,
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final shelfAsync = ref.watch(shelfBooksProvider);
+    final prefs = ref.watch(appPreferencesProvider);
     final tokens = Theme.of(context).extension<BookariaTokens>()!;
 
     return Scaffold(
@@ -110,11 +136,20 @@ class ShelfScreen extends ConsumerWidget {
                 for (final record in books) ...[
                   _OfflineBookCard(
                     record: record,
-                    onOpen: () => unawaited(
-                      context.push(
-                        '/reader/book/${record.slug}?page=${record.lastPageIndex + 1}',
-                      ),
-                    ),
+                    isAgeRestricted: prefs.kidModeEnabled &&
+                        !BookAccessGuard.isAgeAllowed(record.ageMin, prefs),
+                    onOpen: () =>
+                        unawaited(_openOfflineBook(context, prefs, record)),
+                    onOpenAr: record.arPageCount > 0
+                        ? () => unawaited(
+                              _openOfflineBook(
+                                context,
+                                prefs,
+                                record,
+                                ar: true,
+                              ),
+                            )
+                        : null,
                     onDelete: () => _confirmDelete(context, ref, record),
                   ),
                   const SizedBox(height: 12),
@@ -164,12 +199,16 @@ class ShelfScreen extends ConsumerWidget {
 class _OfflineBookCard extends StatelessWidget {
   const _OfflineBookCard({
     required this.record,
+    required this.isAgeRestricted,
     required this.onOpen,
     required this.onDelete,
+    this.onOpenAr,
   });
 
   final OfflineBookRecord record;
+  final bool isAgeRestricted;
   final VoidCallback onOpen;
+  final VoidCallback? onOpenAr;
   final VoidCallback onDelete;
 
   @override
@@ -224,14 +263,27 @@ class _OfflineBookCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Đọc tiếp trang ${record.lastPageIndex + 1}/${record.pageCount} • ${formatBytes(record.totalBytes)}',
+                      isAgeRestricted
+                          ? 'Cần PIN phụ huynh (${record.ageMin}+ tuổi) • ${formatBytes(record.totalBytes)}'
+                          : 'Đọc tiếp trang ${record.lastPageIndex + 1}/${record.pageCount} • ${formatBytes(record.totalBytes)}',
                       style: theme.textTheme.labelMedium?.copyWith(
-                        color: tokens.statusSuccessText,
+                        color: isAgeRestricted
+                            ? tokens.statusWarningText
+                            : tokens.statusSuccessText,
                       ),
                     ),
                   ],
                 ),
               ),
+              if (onOpenAr != null)
+                IconButton(
+                  tooltip: 'Quét AR Offline',
+                  onPressed: onOpenAr,
+                  icon: Icon(
+                    Icons.camera_alt_outlined,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
               IconButton(
                 tooltip: 'Xóa bản offline',
                 onPressed: onDelete,

@@ -6,37 +6,73 @@ void main() {
     test('parses bare slug and preview token', () {
       final slugTarget = BookariaLinkParser.parse('vuon-co-tich-ar');
       expect(slugTarget, isA<PublishedBookTarget>());
-      expect((slugTarget as PublishedBookTarget).slug, 'vuon-co-tich-ar');
-      expect(slugTarget.page, isNull);
-      expect(slugTarget.startInAr, isFalse);
+      final pub = slugTarget as PublishedBookTarget;
+      expect(pub.slug, 'vuon-co-tich-ar');
+      expect(pub.page, isNull);
+      expect(pub.startInAr, isFalse);
+      expect(pub.toAppLocation(), '/reader/book/vuon-co-tich-ar');
 
       const token = 'AbCdEfGhIjKlMnOpQrStUvWxYz012345';
       final previewTarget = BookariaLinkParser.parse(token);
       expect(previewTarget, isA<PreviewBookTarget>());
-      expect((previewTarget as PreviewBookTarget).token, token);
+      final prev = previewTarget as PreviewBookTarget;
+      expect(prev.token, token);
+      expect(prev.toAppLocation(), '/reader/preview/$token');
     });
 
-    test('parses published viewer URLs with page and ar flags', () {
-      final res1 = BookariaLinkParser.parse(
-        'https://viewer.bookaria.vn/b/he-mat-troi/p/4',
+    test('parses published viewer URLs with /read, /p/:page, /ar, and ?mode=ar', () {
+      final resRead = BookariaLinkParser.parse(
+        'https://viewer.localhost:5174/b/he-mat-troi/read',
       );
-      expect(res1, isA<PublishedBookTarget>());
-      final p1 = res1 as PublishedBookTarget;
-      expect(p1.slug, 'he-mat-troi');
-      expect(p1.page, 4);
-      expect(p1.startInAr, isFalse);
+      expect(resRead, isA<PublishedBookTarget>());
+      final read = resRead as PublishedBookTarget;
+      expect(read.slug, 'he-mat-troi');
+      expect(read.page, 1);
+      expect(read.startInAr, isFalse);
+      expect(read.toAppLocation(), '/reader/book/he-mat-troi?page=1');
 
-      final res2 = BookariaLinkParser.parse(
+      final resQueryAr = BookariaLinkParser.parse(
+        'https://viewer.bookaria.vn/b/he-mat-troi?mode=ar&page=3',
+      );
+      expect(resQueryAr, isA<PublishedBookTarget>());
+      final queryAr = resQueryAr as PublishedBookTarget;
+      expect(queryAr.page, 3);
+      expect(queryAr.startInAr, isTrue);
+      expect(
+        queryAr.toAppLocation(),
+        '/reader/book/he-mat-troi?page=3&mode=ar',
+      );
+
+      final resArPage = BookariaLinkParser.parse(
         'https://viewer.bookaria.vn/b/he-mat-troi/ar/p/2',
       );
-      expect(res2, isA<PublishedBookTarget>());
-      final p2 = res2 as PublishedBookTarget;
-      expect(p2.slug, 'he-mat-troi');
-      expect(p2.page, 2);
-      expect(p2.startInAr, isTrue);
+      expect(resArPage, isA<PublishedBookTarget>());
+      final arPage = resArPage as PublishedBookTarget;
+      expect(arPage.slug, 'he-mat-troi');
+      expect(arPage.page, 2);
+      expect(arPage.startInAr, isTrue);
     });
 
-    test('parses preview URLs and rejects invalid values', () {
+    test('parses custom bookaria:// deep links for published and preview books', () {
+      final customPub = BookariaLinkParser.parse('bookaria://b/vuon-co-tich/p/5');
+      expect(customPub, isA<PublishedBookTarget>());
+      final pub = customPub as PublishedBookTarget;
+      expect(pub.slug, 'vuon-co-tich');
+      expect(pub.page, 5);
+      expect(pub.startInAr, isFalse);
+
+      const token = 'AbCdEfGhIjKlMnOpQrStUvWxYz012345';
+      final customPreview = BookariaLinkParser.parse(
+        'bookaria://preview/$token/camera',
+      );
+      expect(customPreview, isA<PreviewBookTarget>());
+      final prev = customPreview as PreviewBookTarget;
+      expect(prev.token, token);
+      expect(prev.startInAr, isTrue);
+      expect(prev.toAppLocation(), '/reader/preview/$token?mode=ar');
+    });
+
+    test('rejects invalid routes, schemes, and unknown hosts', () {
       const token = 'AbCdEfGhIjKlMnOpQrStUvWxYz012345';
       final preview = BookariaLinkParser.parse(
         'https://viewer.bookaria.vn/preview/$token/ar',
@@ -44,8 +80,18 @@ void main() {
       expect(preview, isA<PreviewBookTarget>());
       expect((preview as PreviewBookTarget).startInAr, isTrue);
 
-      final invalid = BookariaLinkParser.parse('https://example.com/unknown');
-      expect(invalid, isA<InvalidBookariaLink>());
+      expect(
+        BookariaLinkParser.parse('https://example.com/unknown'),
+        isA<InvalidBookariaLink>(),
+      );
+      expect(
+        BookariaLinkParser.parse('javascript:alert(1)'),
+        isA<InvalidBookariaLink>(),
+      );
+      expect(
+        BookariaLinkParser.parse('https://viewer.bookaria.vn/b/he-mat-troi/foo'),
+        isA<InvalidBookariaLink>(),
+      );
     });
   });
 }

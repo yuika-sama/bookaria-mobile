@@ -168,6 +168,10 @@ class OfflinePackManager extends Notifier<Map<String, DownloadTaskState>> {
         totalBytes: book.downloadBytes > 0 ? book.downloadBytes : completedBytes,
         pageCount: book.pageCount,
         arPageCount: book.arPageCount,
+        ageMin: book.ageMin,
+        ageMax: book.ageMax,
+        language: book.language,
+        description: book.description,
         downloadedAt: DateTime.now().toUtc(),
       );
       await db.upsertOfflineBook(record);

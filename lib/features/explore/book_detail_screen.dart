@@ -5,7 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../app/book_access_guard.dart';
 import '../../app/theme.dart';
+import '../../core/config/app_config.dart';
 import '../../core/contracts/public_book.dart';
 import '../../core/preferences/app_preferences.dart';
 import '../../core/utils/formatters.dart';
@@ -20,6 +22,28 @@ class BookDetailScreen extends ConsumerWidget {
   });
 
   final String slug;
+
+  Future<void> _openBookReader(
+    BuildContext context, {
+    required AppPreferencesState prefs,
+    required String title,
+    required int? ageMin,
+    required String location,
+  }) async {
+    final decision = await BookAccessGuard.authorizeKnownBook(
+      context,
+      prefs: prefs,
+      ageMin: ageMin,
+      title: title,
+    );
+    if (!decision.allowed || !context.mounted) return;
+    await context.push(
+      location,
+      extra: decision.verifiedByParentPin
+          ? const ReaderRouteExtra(parentPinVerified: true)
+          : null,
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -58,13 +82,35 @@ class BookDetailScreen extends ConsumerWidget {
                   const SizedBox(height: 16),
                   FilledButton.icon(
                     onPressed: () => unawaited(
-                      context.push(
-                        '/reader/book/$slug?page=${offline.lastPageIndex + 1}',
+                      _openBookReader(
+                        context,
+                        prefs: prefs,
+                        title: offline.title,
+                        ageMin: offline.ageMin,
+                        location:
+                            '/reader/book/$slug?page=${offline.lastPageIndex + 1}',
                       ),
                     ),
                     icon: const Icon(Icons.menu_book_rounded),
                     label: const Text('Mở bản đọc Offline'),
                   ),
+                  if (offline.arPageCount > 0) ...[
+                    const SizedBox(height: 10),
+                    FilledButton.tonalIcon(
+                      onPressed: () => unawaited(
+                        _openBookReader(
+                          context,
+                          prefs: prefs,
+                          title: offline.title,
+                          ageMin: offline.ageMin,
+                          location:
+                              '/reader/book/$slug?mode=ar&page=${offline.lastPageIndex + 1}',
+                        ),
+                      ),
+                      icon: const Icon(Icons.camera_alt_outlined),
+                      label: const Text('Quét AR Offline'),
+                    ),
+                  ],
                 ],
               ),
             );
@@ -88,11 +134,15 @@ class BookDetailScreen extends ConsumerWidget {
           );
         },
         data: (book) {
+          final config = ref.watch(appConfigProvider);
           final offline = offlineAsync.asData?.value;
           final isUpToDateOffline =
               offline != null && offline.versionId == book.version.id;
-          final isDownloading =
-              downloadTask != null && !downloadTask.isCompleted && downloadTask.errorMessage == null;
+          final isDownloading = downloadTask != null &&
+              !downloadTask.isCompleted &&
+              downloadTask.errorMessage == null;
+          final isAgeRestricted = prefs.kidModeEnabled &&
+              !BookAccessGuard.isAgeAllowed(book.ageMin, prefs);
 
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
@@ -156,13 +206,43 @@ class BookDetailScreen extends ConsumerWidget {
                   ),
                 ],
               ),
+              if (isAgeRestricted) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: tokens.statusWarningBg,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.lock_outline_rounded,
+                          color: tokens.statusWarningText),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Sách dành cho ${book.ageMin}+ tuổi (vượt giới hạn Kid Mode ≤ ${prefs.kidMaxAge} tuổi). Cần mã PIN phụ huynh để mở.',
+                          style: TextStyle(color: tokens.statusWarningText),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 20),
               Row(
                 children: [
                   Expanded(
                     child: FilledButton.icon(
-                      onPressed: () =>
-                          unawaited(context.push('/reader/book/${book.slug}')),
+                      onPressed: () => unawaited(
+                        _openBookReader(
+                          context,
+                          prefs: prefs,
+                          title: book.title,
+                          ageMin: book.ageMin,
+                          location: '/reader/book/${book.slug}',
+                        ),
+                      ),
                       icon: const Icon(Icons.view_in_ar_outlined),
                       label: const Text('Đọc 3D'),
                     ),
@@ -172,7 +252,13 @@ class BookDetailScreen extends ConsumerWidget {
                     Expanded(
                       child: FilledButton.tonalIcon(
                         onPressed: () => unawaited(
-                          context.push('/reader/book/${book.slug}?mode=ar'),
+                          _openBookReader(
+                            context,
+                            prefs: prefs,
+                            title: book.title,
+                            ageMin: book.ageMin,
+                            location: '/reader/book/${book.slug}?mode=ar',
+                          ),
                         ),
                         icon: const Icon(Icons.camera_alt_outlined),
                         label: const Text('Quét AR'),
@@ -181,6 +267,20 @@ class BookDetailScreen extends ConsumerWidget {
                   ],
                 ],
               ),
+              if (!prefs.kidModeEnabled) ...[
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final uri = config.bookWebViewerUrl(book.slug);
+                    await launchUrl(
+                      uri,
+                      mode: LaunchMode.externalApplication,
+                    );
+                  },
+                  icon: const Icon(Icons.open_in_browser_outlined),
+                  label: const Text('Mở trên Web Viewer'),
+                ),
+              ],
               const SizedBox(height: 12),
               _OfflineDownloadCard(
                 book: book,
@@ -189,6 +289,13 @@ class BookDetailScreen extends ConsumerWidget {
                 hasOlderOffline: offline != null && !isUpToDateOffline,
                 downloadTask: downloadTask,
                 onDownload: () async {
+                  final decision = await BookAccessGuard.authorizeKnownBook(
+                    context,
+                    prefs: prefs,
+                    ageMin: book.ageMin,
+                    title: book.title,
+                  );
+                  if (!decision.allowed) return;
                   try {
                     await ref
                         .read(offlinePackManagerProvider.notifier)

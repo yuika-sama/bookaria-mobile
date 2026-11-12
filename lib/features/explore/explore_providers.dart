@@ -1,5 +1,8 @@
+import 'dart:math' as math;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../app/book_access_guard.dart';
 import '../../core/contracts/public_book.dart';
 import '../../core/network/api_client.dart';
 import '../../core/preferences/app_preferences.dart';
@@ -55,11 +58,14 @@ final exploreBooksProvider = FutureProvider<PagedResponse<PublicBookCard>>(
   (ref) async {
     final filter = ref.watch(exploreFilterProvider);
     final prefs = ref.watch(appPreferencesProvider);
-    final effectiveAge =
-        prefs.kidModeEnabled ? (filter.age ?? prefs.kidMaxAge) : filter.age;
+    final effectiveAge = prefs.kidModeEnabled
+        ? (filter.age != null
+            ? math.min(filter.age!, prefs.kidMaxAge)
+            : prefs.kidMaxAge)
+        : filter.age;
 
     final api = ref.watch(bookariaApiClientProvider);
-    return api.getPublicBooks(
+    final response = await api.getPublicBooks(
       PublicBooksQuery(
         q: filter.query,
         age: effectiveAge,
@@ -67,6 +73,12 @@ final exploreBooksProvider = FutureProvider<PagedResponse<PublicBookCard>>(
         sort: filter.sort,
       ),
     );
+    if (!prefs.kidModeEnabled) return response;
+
+    final safeCards = response.data
+        .where((book) => BookAccessGuard.isAgeAllowed(book.ageMin, prefs))
+        .toList();
+    return PagedResponse(data: safeCards, meta: response.meta);
   },
 );
 

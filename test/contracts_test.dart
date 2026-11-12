@@ -46,7 +46,7 @@ void main() {
       expect(detail.printPdfUrl, 'https://cdn.example.com/print.pdf');
     });
 
-    test('parses Manifest with pageWidthMm fallback and Scene interactions', () {
+    test('parses Manifest with pageWidthMm fallback and lowercase Scene types', () {
       final manifest = Manifest.fromJson({
         'schemaVersion': 1,
         'bookId': 'b1',
@@ -90,7 +90,7 @@ void main() {
               'objects': [
                 {
                   'id': 'sun',
-                  'type': 'MODEL',
+                  'type': 'model',
                   'name': 'Mặt Trời',
                   'assetId': 'a1',
                   'transform': {
@@ -105,7 +105,12 @@ void main() {
                   'id': 'r1',
                   'trigger': {'type': 'onTap', 'objectId': 'sun'},
                   'actions': [
-                    {'type': 'showMessage', 'text': 'Xin chào Mặt Trời!'},
+                    {
+                      'type': 'setState',
+                      'key': 'score',
+                      'operation': 'increment',
+                      'value': 1,
+                    },
                   ],
                 },
               ],
@@ -126,6 +131,7 @@ void main() {
       expect(manifest.hasAnyArPage, isTrue);
       expect(manifest.pages.first.marker.mode, MarkerMode.bookariaMarker);
       expect(manifest.pages.first.marker.number, 12);
+      expect(manifest.pages.first.scene.objects.first.type, 'model');
       expect(manifest.pages.first.scene.tappableObjects.length, 1);
       expect(manifest.assets['a1']?.type, AssetType.model);
     });

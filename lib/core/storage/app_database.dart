@@ -17,6 +17,10 @@ class OfflineBookRecord {
     required this.totalBytes,
     required this.pageCount,
     required this.arPageCount,
+    this.ageMin,
+    this.ageMax,
+    this.language = 'vi',
+    this.description,
     this.lastPageIndex = 0,
     required this.downloadedAt,
     this.lastOpenedAt,
@@ -33,6 +37,10 @@ class OfflineBookRecord {
   final int totalBytes;
   final int pageCount;
   final int arPageCount;
+  final int? ageMin;
+  final int? ageMax;
+  final String language;
+  final String? description;
   final int lastPageIndex;
   final DateTime downloadedAt;
   final DateTime? lastOpenedAt;
@@ -49,6 +57,10 @@ class OfflineBookRecord {
         'total_bytes': totalBytes,
         'page_count': pageCount,
         'ar_page_count': arPageCount,
+        'age_min': ageMin,
+        'age_max': ageMax,
+        'language': language,
+        'description': description,
         'last_page_index': lastPageIndex,
         'downloaded_at': downloadedAt.toUtc().toIso8601String(),
         'last_opened_at': lastOpenedAt?.toUtc().toIso8601String(),
@@ -67,6 +79,10 @@ class OfflineBookRecord {
       totalBytes: row['total_bytes'] as int,
       pageCount: row['page_count'] as int,
       arPageCount: row['ar_page_count'] as int,
+      ageMin: row['age_min'] as int?,
+      ageMax: row['age_max'] as int?,
+      language: (row['language'] as String?) ?? 'vi',
+      description: row['description'] as String?,
       lastPageIndex: row['last_page_index'] as int,
       downloadedAt: DateTime.parse(row['downloaded_at'] as String),
       lastOpenedAt: row['last_opened_at'] != null
@@ -122,8 +138,9 @@ class AppDatabase {
     final db = await dbFactory.openDatabase(
       dbPath,
       options: OpenDatabaseOptions(
-        version: 1,
+        version: 2,
         onCreate: _onCreate,
+        onUpgrade: _onUpgrade,
       ),
     );
     return AppDatabase._(db);
@@ -143,6 +160,10 @@ class AppDatabase {
         total_bytes INTEGER NOT NULL,
         page_count INTEGER NOT NULL,
         ar_page_count INTEGER NOT NULL,
+        age_min INTEGER,
+        age_max INTEGER,
+        language TEXT NOT NULL DEFAULT 'vi',
+        description TEXT,
         last_page_index INTEGER NOT NULL DEFAULT 0,
         downloaded_at TEXT NOT NULL,
         last_opened_at TEXT
@@ -171,6 +192,23 @@ class AppDatabase {
         created_at TEXT NOT NULL
       )
     ''');
+  }
+
+  static Future<void> _onUpgrade(
+    Database db,
+    int oldVersion,
+    int newVersion,
+  ) async {
+    if (oldVersion < 2) {
+      await db.execute('ALTER TABLE offline_books ADD COLUMN age_min INTEGER');
+      await db.execute('ALTER TABLE offline_books ADD COLUMN age_max INTEGER');
+      await db.execute(
+        "ALTER TABLE offline_books ADD COLUMN language TEXT NOT NULL DEFAULT 'vi'",
+      );
+      await db.execute(
+        'ALTER TABLE offline_books ADD COLUMN description TEXT',
+      );
+    }
   }
 
   Future<List<OfflineBookRecord>> listOfflineBooks() async {

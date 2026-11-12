@@ -1,7 +1,31 @@
+import java.net.URI
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+fun resolveWebViewerHost(): String {
+    val envFile = listOf(
+        rootProject.file("../.env"),
+        rootProject.file("../.env.example"),
+    ).firstOrNull { it.exists() } ?: return "localhost"
+
+    for (rawLine in envFile.readLines()) {
+        val line = rawLine.trim()
+        if (line.isEmpty() || line.startsWith("#")) continue
+        if (line.startsWith("WEB_VIEWER_ORIGIN=")) {
+            val rawUrl = line.substringAfter("=")
+                .trim()
+                .trim('"', '\'')
+            val host = runCatching { URI(rawUrl).host }.getOrNull()
+            if (!host.isNullOrBlank()) {
+                return host
+            }
+        }
+    }
+    return "localhost"
 }
 
 android {
@@ -26,6 +50,7 @@ android {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["webViewerHost"] = resolveWebViewerHost()
     }
 
     buildTypes {
