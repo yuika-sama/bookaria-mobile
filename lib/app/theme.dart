@@ -150,28 +150,70 @@ ThemeData buildBookariaTheme(Brightness brightness) {
     cardTheme: CardThemeData(
       color: tokens.bgSurface,
       elevation: 0,
+      margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: tokens.borderDefault),
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: tokens.borderDefault, width: 1.0),
+      ),
+    ),
+    appBarTheme: AppBarTheme(
+      backgroundColor: tokens.bgCanvas,
+      foregroundColor: colorScheme.onSurface,
+      elevation: 0,
+      scrolledUnderElevation: 0.5,
+      titleTextStyle: headingStyle.copyWith(
+        fontSize: 18,
+        fontWeight: FontWeight.w700,
+        letterSpacing: -0.2,
+      ),
+    ),
+    bottomSheetTheme: BottomSheetThemeData(
+      backgroundColor: tokens.bgSurface,
+      modalBackgroundColor: tokens.bgSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+    ),
+    dialogTheme: DialogThemeData(
+      backgroundColor: tokens.bgSurface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+      ),
+    ),
+    chipTheme: ChipThemeData(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+      ),
+      side: BorderSide(color: tokens.borderDefault),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+      labelStyle: bodyTextTheme.labelMedium?.copyWith(
+        fontWeight: FontWeight.w600,
+        fontSize: 13,
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: tokens.bgSurface,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: tokens.borderDefault),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: tokens.borderDefault),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: colorScheme.primary, width: 1.6),
       ),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         minimumSize: const Size(0, 48),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(12),
         ),
       ),
     ),
@@ -180,7 +222,7 @@ ThemeData buildBookariaTheme(Brightness brightness) {
         minimumSize: const Size(0, 48),
         side: BorderSide(color: tokens.borderDefault),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(12),
         ),
       ),
     ),

@@ -6,11 +6,15 @@ import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../app/book_access_guard.dart';
+import '../../app/theme.dart';
 import '../../core/haptics/haptics_service.dart';
 import '../../core/network/api_client.dart';
 import '../../core/preferences/app_preferences.dart';
 import '../../core/qr/bookaria_link_parser.dart';
 import '../../core/storage/app_database.dart';
+import '../../core/ui/tokens/app_spacing.dart';
+import '../../core/ui/widgets/bookaria_feedback.dart';
+import '../../core/ui/widgets/interactive_scale.dart';
 
 class QuickScannerScreen extends ConsumerStatefulWidget {
   const QuickScannerScreen({super.key});
@@ -19,8 +23,10 @@ class QuickScannerScreen extends ConsumerStatefulWidget {
   ConsumerState<QuickScannerScreen> createState() => _QuickScannerScreenState();
 }
 
-class _QuickScannerScreenState extends ConsumerState<QuickScannerScreen> {
+class _QuickScannerScreenState extends ConsumerState<QuickScannerScreen>
+    with SingleTickerProviderStateMixin {
   late final MobileScannerController _controller;
+  late final AnimationController _scanLineController;
   bool _navigated = false;
   DateTime? _lastErrorSnackAt;
 
@@ -30,10 +36,15 @@ class _QuickScannerScreenState extends ConsumerState<QuickScannerScreen> {
     _controller = MobileScannerController(
       detectionSpeed: DetectionSpeed.normal,
     );
+    _scanLineController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat(reverse: true);
   }
 
   @override
   void dispose() {
+    _scanLineController.dispose();
     unawaited(_controller.dispose());
     super.dispose();
   }
@@ -77,9 +88,7 @@ class _QuickScannerScreenState extends ConsumerState<QuickScannerScreen> {
             now.difference(_lastErrorSnackAt!) > const Duration(seconds: 3)) {
           _lastErrorSnackAt = now;
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(reason)),
-            );
+            BookariaFeedback.showError(context, message: reason);
           }
         }
     }
@@ -90,6 +99,10 @@ class _QuickScannerScreenState extends ConsumerState<QuickScannerScreen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (_) => const _ManualBookInputSheet(),
     );
     if (submitted != null && submitted.trim().isNotEmpty) {
@@ -149,21 +162,27 @@ class _QuickScannerScreenState extends ConsumerState<QuickScannerScreen> {
                       ),
                       const SizedBox(height: 16),
                       const Text(
-                        'Không truy cập được camera trên thiết bị này.',
+                        'Không thể truy cập camera trên thiết bị.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.white, fontSize: 16),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         error.errorDetails?.message ?? error.errorCode.name,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.white70),
+                        style: const TextStyle(color: Colors.white70, fontSize: 13),
                       ),
-                      const SizedBox(height: 20),
-                      FilledButton.icon(
-                        onPressed: _openManualInputSheet,
-                        icon: const Icon(Icons.keyboard_outlined),
-                        label: const Text('Nhập mã / liên kết thủ công'),
+                      const SizedBox(height: 24),
+                      InteractiveScale(
+                        child: FilledButton.icon(
+                          onPressed: _openManualInputSheet,
+                          icon: const Icon(Icons.keyboard_outlined),
+                          label: const Text('Nhập mã / liên kết thủ công'),
+                        ),
                       ),
                     ],
                   ),
@@ -171,16 +190,64 @@ class _QuickScannerScreenState extends ConsumerState<QuickScannerScreen> {
               );
             },
           ),
+
+          // Central QR Target frame with scanning line
           Center(
-            child: Container(
-              width: 240,
-              height: 240,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.white, width: 2.5),
-                borderRadius: BorderRadius.circular(20),
+            child: SizedBox(
+              width: 250,
+              height: 250,
+              child: Stack(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.85),
+                        width: 2.5,
+                      ),
+                      borderRadius: AppRadius.roundedLg,
+                    ),
+                  ),
+                  // Animated laser scanning line
+                  AnimatedBuilder(
+                    animation: _scanLineController,
+                    builder: (context, _) {
+                      return Positioned(
+                        top: _scanLineController.value * 235,
+                        left: 10,
+                        right: 10,
+                        child: Container(
+                          height: 2.5,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.transparent,
+                                Theme.of(context).colorScheme.primary,
+                                Colors.white,
+                                Theme.of(context).colorScheme.primary,
+                                Colors.transparent,
+                              ],
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .primary
+                                    .withValues(alpha: 0.6),
+                                blurRadius: 8,
+                                spreadRadius: 1,
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
             ),
           ),
+
+          // Bottom instruction & manual input CTA
           Positioned(
             left: 20,
             right: 20,
@@ -196,24 +263,27 @@ class _QuickScannerScreenState extends ConsumerState<QuickScannerScreen> {
                     ),
                     decoration: BoxDecoration(
                       color: Colors.black.withValues(alpha: 0.72),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: AppRadius.roundedMd,
+                      border: Border.all(color: Colors.white24),
                     ),
                     child: const Text(
                       'Đưa mã QR trên sách in hoặc Studio Preview vào giữa khung hình.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.white),
+                      style: TextStyle(color: Colors.white, fontSize: 13),
                     ),
                   ),
                   const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      side: const BorderSide(color: Colors.white54),
-                      backgroundColor: Colors.black.withValues(alpha: 0.45),
+                  InteractiveScale(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: const BorderSide(color: Colors.white54),
+                        backgroundColor: Colors.black.withValues(alpha: 0.55),
+                      ),
+                      onPressed: _openManualInputSheet,
+                      icon: const Icon(Icons.edit_note_rounded),
+                      label: const Text('Nhập slug / link thủ công'),
                     ),
-                    onPressed: _openManualInputSheet,
-                    icon: const Icon(Icons.edit_note_rounded),
-                    label: const Text('Nhập slug / link thủ công'),
                   ),
                 ],
               ),
@@ -234,6 +304,7 @@ class _ManualBookInputSheet extends StatefulWidget {
 
 class _ManualBookInputSheetState extends State<_ManualBookInputSheet> {
   final TextEditingController _textController = TextEditingController();
+  String? _inputError;
 
   @override
   void dispose() {
@@ -241,16 +312,24 @@ class _ManualBookInputSheetState extends State<_ManualBookInputSheet> {
     super.dispose();
   }
 
-  void _submit([String? rawValue]) {
-    Navigator.of(context).pop(rawValue ?? _textController.text);
+  void _submit() {
+    final text = _textController.text.trim();
+    if (text.isEmpty) {
+      setState(() => _inputError = 'Vui lòng nhập mã sách hoặc liên kết!');
+      return;
+    }
+    Navigator.of(context).pop(text);
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens = theme.extension<BookariaTokens>()!;
+
     return Padding(
       padding: EdgeInsets.fromLTRB(
         20,
-        20,
+        16,
         20,
         MediaQuery.of(context).viewInsets.bottom + 20,
       ),
@@ -258,27 +337,49 @@ class _ManualBookInputSheetState extends State<_ManualBookInputSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: tokens.borderDefault,
+                borderRadius: AppRadius.roundedPill,
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
           Text(
             'Nhập liên kết hoặc mã sách',
-            style: Theme.of(context).textTheme.titleMedium,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
           ),
-          const SizedBox(height: 8),
-          const Text(
+          const SizedBox(height: 4),
+          Text(
             'Hỗ trợ URL (/b/:slug, /preview/:token), mã preview 32 ký tự hoặc slug sách.',
+            style: theme.textTheme.bodySmall?.copyWith(color: tokens.textMuted),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           TextField(
             controller: _textController,
             autofocus: true,
-            decoration: const InputDecoration(
+            onChanged: (_) {
+              if (_inputError != null) {
+                setState(() => _inputError = null);
+              }
+            },
+            decoration: InputDecoration(
               hintText: 'Ví dụ: vuon-co-tich hoặc https://.../b/vuon-co-tich',
+              errorText: _inputError,
             ),
-            onSubmitted: _submit,
+            onSubmitted: (_) => _submit(),
           ),
-          const SizedBox(height: 14),
-          FilledButton(
-            onPressed: () => _submit(),
-            child: const Text('Mở sách'),
+          const SizedBox(height: AppSpacing.lg),
+          InteractiveScale(
+            child: FilledButton(
+              onPressed: _submit,
+              child: const Text('Mở sách ngay'),
+            ),
           ),
         ],
       ),

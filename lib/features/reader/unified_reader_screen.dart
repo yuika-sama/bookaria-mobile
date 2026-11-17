@@ -24,6 +24,10 @@ import '../../core/preferences/app_preferences.dart';
 import '../../core/storage/app_database.dart';
 import '../../core/storage/offline_storage_paths.dart';
 import '../../core/telemetry/reading_events_service.dart';
+import '../../core/ui/tokens/app_spacing.dart';
+import '../../core/ui/widgets/bookaria_error_view.dart';
+import '../../core/ui/widgets/bookaria_loading.dart';
+import '../../core/ui/widgets/interactive_scale.dart';
 import '../offline_pack/local_asset_server.dart';
 import '../offline_pack/offline_pack_manager.dart';
 import '../shelf/shelf_providers.dart';
@@ -1258,39 +1262,55 @@ class _UnifiedReaderScreenState extends ConsumerState<UnifiedReaderScreen> {
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const BookariaLoadingIndicator(
+              message: 'Đang mở sách và tải mô hình 3D…',
+            )
           : _kidLocked
               ? Center(
                   child: Padding(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(AppSpacing.xxl),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          Icons.child_care_rounded,
-                          size: 56,
-                          color: tokens.statusWarningText,
+                        Container(
+                          padding: const EdgeInsets.all(AppSpacing.lg),
+                          decoration: BoxDecoration(
+                            color: tokens.statusWarningBg,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.child_care_rounded,
+                            size: 48,
+                            color: tokens.statusWarningText,
+                          ),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: AppSpacing.lg),
                         Text(
                           'Đã khóa bởi Chế độ Trẻ em',
-                          style: Theme.of(context).textTheme.titleMedium,
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
                           textAlign: TextAlign.center,
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: AppSpacing.sm),
                         Text(
                           _kidLockReason ??
                               'Cần xác nhận mã PIN phụ huynh để mở sách này.',
                           textAlign: TextAlign.center,
-                          style: TextStyle(color: tokens.textMuted),
+                          style: TextStyle(
+                            color: tokens.textMuted,
+                            height: 1.4,
+                          ),
                         ),
-                        const SizedBox(height: 20),
-                        FilledButton.icon(
-                          onPressed: () => unawaited(_loadBook()),
-                          icon: const Icon(Icons.lock_open_rounded),
-                          label: const Text('Mở bằng mã PIN phụ huynh'),
+                        const SizedBox(height: AppSpacing.xl),
+                        InteractiveScale(
+                          child: FilledButton.icon(
+                            onPressed: () => unawaited(_loadBook()),
+                            icon: const Icon(Icons.lock_open_rounded),
+                            label: const Text('Mở bằng mã PIN phụ huynh'),
+                          ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: AppSpacing.sm),
                         TextButton(
                           onPressed: () {
                             if (context.canPop()) {
@@ -1306,21 +1326,18 @@ class _UnifiedReaderScreenState extends ConsumerState<UnifiedReaderScreen> {
                   ),
                 )
               : _error != null
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(_error!, textAlign: TextAlign.center),
-                            const SizedBox(height: 16),
-                            FilledButton(
-                              onPressed: () => unawaited(_loadBook()),
-                              child: const Text('Thử lại'),
-                            ),
-                          ],
-                        ),
-                      ),
+                  ? BookariaErrorView(
+                      error: _error!,
+                      onRetry: () => _loadBook(),
+                      secondaryActionLabel: 'Quay lại',
+                      secondaryActionIcon: Icons.arrow_back_rounded,
+                      onSecondaryAction: () {
+                        if (context.canPop()) {
+                          context.pop();
+                        } else {
+                          context.go('/explore');
+                        }
+                      },
                     )
                   : manifest == null || page == null
                       ? const Center(child: Text('Sách chưa có trang nào.'))

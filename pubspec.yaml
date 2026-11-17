@@ -54,6 +54,7 @@ dependencies:
   webview_flutter_platform_interface: ^2.15.1
   webview_flutter_wkwebview: ^3.25.1
   mime: ^2.0.0
+  flutter_svg: ^2.3.0
 
 dev_dependencies:
   flutter_test:
@@ -80,6 +81,8 @@ flutter:
 
   assets:
     - .env
+    - assets/
+    - assets/logo/
     - assets/viewer/
     - assets/viewer/assets/
     - assets/viewer/brand/

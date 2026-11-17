@@ -26,6 +26,41 @@ bool _isPinVerified(GoRouterState state) {
   return extra is ReaderRouteExtra && extra.parentPinVerified;
 }
 
+CustomTransitionPage<void> _buildFadeSlidePage({
+  required LocalKey key,
+  required Widget child,
+}) {
+  return CustomTransitionPage<void>(
+    key: key,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 280),
+    reverseTransitionDuration: const Duration(milliseconds: 220),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final curved = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInQuad,
+      );
+      final offsetAnimation = Tween<Offset>(
+        begin: const Offset(0, 0.04),
+        end: Offset.zero,
+      ).animate(curved);
+      final fadeAnimation = Tween<double>(
+        begin: 0.0,
+        end: 1.0,
+      ).animate(curved);
+
+      return FadeTransition(
+        opacity: fadeAnimation,
+        child: SlideTransition(
+          position: offsetAnimation,
+          child: child,
+        ),
+      );
+    },
+  );
+}
+
 final bookariaRootNavigatorKeyProvider =
     Provider<GlobalKey<NavigatorState>>((ref) {
   return GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -87,156 +122,204 @@ final bookariaRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/scan',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => const QuickScannerScreen(),
+        pageBuilder: (context, state) => _buildFadeSlidePage(
+          key: state.pageKey,
+          child: const QuickScannerScreen(),
+        ),
       ),
       GoRoute(
         path: '/book/:slug',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => BookDetailScreen(
-          slug: state.pathParameters['slug']!,
+        pageBuilder: (context, state) => _buildFadeSlidePage(
+          key: state.pageKey,
+          child: BookDetailScreen(
+            slug: state.pathParameters['slug']!,
+          ),
         ),
       ),
       GoRoute(
         path: '/reader/book/:slug',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => UnifiedReaderScreen(
-          slug: state.pathParameters['slug']!,
-          initialPage: int.tryParse(state.uri.queryParameters['page'] ?? ''),
-          initialMode: _parseMode(state.uri.queryParameters['mode']),
-          parentPinVerified: _isPinVerified(state),
+        pageBuilder: (context, state) => _buildFadeSlidePage(
+          key: state.pageKey,
+          child: UnifiedReaderScreen(
+            slug: state.pathParameters['slug']!,
+            initialPage: int.tryParse(state.uri.queryParameters['page'] ?? ''),
+            initialMode: _parseMode(state.uri.queryParameters['mode']),
+            parentPinVerified: _isPinVerified(state),
+          ),
         ),
       ),
       GoRoute(
         path: '/reader/preview/:token',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => UnifiedReaderScreen(
-          previewToken: state.pathParameters['token']!,
-          initialPage: int.tryParse(state.uri.queryParameters['page'] ?? ''),
-          initialMode: _parseMode(state.uri.queryParameters['mode']),
-          parentPinVerified: _isPinVerified(state),
+        pageBuilder: (context, state) => _buildFadeSlidePage(
+          key: state.pageKey,
+          child: UnifiedReaderScreen(
+            previewToken: state.pathParameters['token']!,
+            initialPage: int.tryParse(state.uri.queryParameters['page'] ?? ''),
+            initialMode: _parseMode(state.uri.queryParameters['mode']),
+            parentPinVerified: _isPinVerified(state),
+          ),
         ),
       ),
       // Direct `bookaria-viewer` web route equivalents (for deep links / internal navigation)
       GoRoute(
         path: '/b/:slug',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => UnifiedReaderScreen(
-          slug: state.pathParameters['slug']!,
-          initialPage: int.tryParse(state.uri.queryParameters['page'] ?? ''),
-          initialMode: _parseMode(state.uri.queryParameters['mode']),
-          parentPinVerified: _isPinVerified(state),
+        pageBuilder: (context, state) => _buildFadeSlidePage(
+          key: state.pageKey,
+          child: UnifiedReaderScreen(
+            slug: state.pathParameters['slug']!,
+            initialPage: int.tryParse(state.uri.queryParameters['page'] ?? ''),
+            initialMode: _parseMode(state.uri.queryParameters['mode']),
+            parentPinVerified: _isPinVerified(state),
+          ),
         ),
       ),
       GoRoute(
         path: '/b/:slug/read',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => UnifiedReaderScreen(
-          slug: state.pathParameters['slug']!,
-          initialPage:
-              int.tryParse(state.uri.queryParameters['page'] ?? '') ?? 1,
-          initialMode: ReaderViewMode.mode3d,
-          parentPinVerified: _isPinVerified(state),
+        pageBuilder: (context, state) => _buildFadeSlidePage(
+          key: state.pageKey,
+          child: UnifiedReaderScreen(
+            slug: state.pathParameters['slug']!,
+            initialPage:
+                int.tryParse(state.uri.queryParameters['page'] ?? '') ?? 1,
+            initialMode: ReaderViewMode.mode3d,
+            parentPinVerified: _isPinVerified(state),
+          ),
         ),
       ),
       GoRoute(
         path: '/b/:slug/p/:page',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => UnifiedReaderScreen(
-          slug: state.pathParameters['slug']!,
-          initialPage: int.tryParse(state.pathParameters['page'] ?? ''),
-          initialMode: _parseMode(state.uri.queryParameters['mode']),
-          parentPinVerified: _isPinVerified(state),
+        pageBuilder: (context, state) => _buildFadeSlidePage(
+          key: state.pageKey,
+          child: UnifiedReaderScreen(
+            slug: state.pathParameters['slug']!,
+            initialPage: int.tryParse(state.pathParameters['page'] ?? ''),
+            initialMode: _parseMode(state.uri.queryParameters['mode']),
+            parentPinVerified: _isPinVerified(state),
+          ),
         ),
       ),
       GoRoute(
         path: '/b/:slug/camera',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => UnifiedReaderScreen(
-          slug: state.pathParameters['slug']!,
-          initialPage: int.tryParse(state.uri.queryParameters['page'] ?? ''),
-          initialMode: ReaderViewMode.modeAr,
-          parentPinVerified: _isPinVerified(state),
+        pageBuilder: (context, state) => _buildFadeSlidePage(
+          key: state.pageKey,
+          child: UnifiedReaderScreen(
+            slug: state.pathParameters['slug']!,
+            initialPage: int.tryParse(state.uri.queryParameters['page'] ?? ''),
+            initialMode: ReaderViewMode.modeAr,
+            parentPinVerified: _isPinVerified(state),
+          ),
         ),
       ),
       GoRoute(
         path: '/b/:slug/ar',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => UnifiedReaderScreen(
-          slug: state.pathParameters['slug']!,
-          initialPage: int.tryParse(state.uri.queryParameters['page'] ?? ''),
-          initialMode: ReaderViewMode.modeAr,
-          parentPinVerified: _isPinVerified(state),
+        pageBuilder: (context, state) => _buildFadeSlidePage(
+          key: state.pageKey,
+          child: UnifiedReaderScreen(
+            slug: state.pathParameters['slug']!,
+            initialPage: int.tryParse(state.uri.queryParameters['page'] ?? ''),
+            initialMode: ReaderViewMode.modeAr,
+            parentPinVerified: _isPinVerified(state),
+          ),
         ),
       ),
       GoRoute(
         path: '/b/:slug/ar/p/:page',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => UnifiedReaderScreen(
-          slug: state.pathParameters['slug']!,
-          initialPage: int.tryParse(state.pathParameters['page'] ?? ''),
-          initialMode: ReaderViewMode.modeAr,
-          parentPinVerified: _isPinVerified(state),
+        pageBuilder: (context, state) => _buildFadeSlidePage(
+          key: state.pageKey,
+          child: UnifiedReaderScreen(
+            slug: state.pathParameters['slug']!,
+            initialPage: int.tryParse(state.pathParameters['page'] ?? ''),
+            initialMode: ReaderViewMode.modeAr,
+            parentPinVerified: _isPinVerified(state),
+          ),
         ),
       ),
       GoRoute(
         path: '/preview/:token',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => UnifiedReaderScreen(
-          previewToken: state.pathParameters['token']!,
-          initialPage: int.tryParse(state.uri.queryParameters['page'] ?? ''),
-          initialMode: _parseMode(state.uri.queryParameters['mode']),
-          parentPinVerified: _isPinVerified(state),
+        pageBuilder: (context, state) => _buildFadeSlidePage(
+          key: state.pageKey,
+          child: UnifiedReaderScreen(
+            previewToken: state.pathParameters['token']!,
+            initialPage: int.tryParse(state.uri.queryParameters['page'] ?? ''),
+            initialMode: _parseMode(state.uri.queryParameters['mode']),
+            parentPinVerified: _isPinVerified(state),
+          ),
         ),
       ),
       GoRoute(
         path: '/preview/:token/read',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => UnifiedReaderScreen(
-          previewToken: state.pathParameters['token']!,
-          initialPage:
-              int.tryParse(state.uri.queryParameters['page'] ?? '') ?? 1,
-          initialMode: ReaderViewMode.mode3d,
-          parentPinVerified: _isPinVerified(state),
+        pageBuilder: (context, state) => _buildFadeSlidePage(
+          key: state.pageKey,
+          child: UnifiedReaderScreen(
+            previewToken: state.pathParameters['token']!,
+            initialPage:
+                int.tryParse(state.uri.queryParameters['page'] ?? '') ?? 1,
+            initialMode: ReaderViewMode.mode3d,
+            parentPinVerified: _isPinVerified(state),
+          ),
         ),
       ),
       GoRoute(
         path: '/preview/:token/p/:page',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => UnifiedReaderScreen(
-          previewToken: state.pathParameters['token']!,
-          initialPage: int.tryParse(state.pathParameters['page'] ?? ''),
-          initialMode: _parseMode(state.uri.queryParameters['mode']),
-          parentPinVerified: _isPinVerified(state),
+        pageBuilder: (context, state) => _buildFadeSlidePage(
+          key: state.pageKey,
+          child: UnifiedReaderScreen(
+            previewToken: state.pathParameters['token']!,
+            initialPage: int.tryParse(state.pathParameters['page'] ?? ''),
+            initialMode: _parseMode(state.uri.queryParameters['mode']),
+            parentPinVerified: _isPinVerified(state),
+          ),
         ),
       ),
       GoRoute(
         path: '/preview/:token/camera',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => UnifiedReaderScreen(
-          previewToken: state.pathParameters['token']!,
-          initialPage: int.tryParse(state.uri.queryParameters['page'] ?? ''),
-          initialMode: ReaderViewMode.modeAr,
-          parentPinVerified: _isPinVerified(state),
+        pageBuilder: (context, state) => _buildFadeSlidePage(
+          key: state.pageKey,
+          child: UnifiedReaderScreen(
+            previewToken: state.pathParameters['token']!,
+            initialPage: int.tryParse(state.uri.queryParameters['page'] ?? ''),
+            initialMode: ReaderViewMode.modeAr,
+            parentPinVerified: _isPinVerified(state),
+          ),
         ),
       ),
       GoRoute(
         path: '/preview/:token/ar',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => UnifiedReaderScreen(
-          previewToken: state.pathParameters['token']!,
-          initialPage: int.tryParse(state.uri.queryParameters['page'] ?? ''),
-          initialMode: ReaderViewMode.modeAr,
-          parentPinVerified: _isPinVerified(state),
+        pageBuilder: (context, state) => _buildFadeSlidePage(
+          key: state.pageKey,
+          child: UnifiedReaderScreen(
+            previewToken: state.pathParameters['token']!,
+            initialPage: int.tryParse(state.uri.queryParameters['page'] ?? ''),
+            initialMode: ReaderViewMode.modeAr,
+            parentPinVerified: _isPinVerified(state),
+          ),
         ),
       ),
       GoRoute(
         path: '/preview/:token/ar/p/:page',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => UnifiedReaderScreen(
-          previewToken: state.pathParameters['token']!,
-          initialPage: int.tryParse(state.pathParameters['page'] ?? ''),
-          initialMode: ReaderViewMode.modeAr,
-          parentPinVerified: _isPinVerified(state),
+        pageBuilder: (context, state) => _buildFadeSlidePage(
+          key: state.pageKey,
+          child: UnifiedReaderScreen(
+            previewToken: state.pathParameters['token']!,
+            initialPage: int.tryParse(state.pathParameters['page'] ?? ''),
+            initialMode: ReaderViewMode.modeAr,
+            parentPinVerified: _isPinVerified(state),
+          ),
         ),
       ),
     ],

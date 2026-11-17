@@ -5,6 +5,7 @@ import '../core/network/api_client.dart';
 import '../core/preferences/app_preferences.dart';
 import '../core/qr/bookaria_link_parser.dart';
 import '../core/storage/app_database.dart';
+import '../core/ui/pin/pin_input_panel.dart';
 
 class ReaderRouteExtra {
   const ReaderRouteExtra({this.parentPinVerified = false});
@@ -149,78 +150,10 @@ class BookAccessGuard {
     required String expectedPin,
     required String reason,
   }) async {
-    final submitted = await showDialog<String>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => _ParentPinPromptDialog(reason: reason),
-    );
-
-    if (submitted == null) return false;
-    final matched = submitted.trim() == expectedPin;
-    if (!matched && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Mã PIN phụ huynh không chính xác.')),
-      );
-    }
-    return matched;
-  }
-}
-
-class _ParentPinPromptDialog extends StatefulWidget {
-  const _ParentPinPromptDialog({required this.reason});
-
-  final String reason;
-
-  @override
-  State<_ParentPinPromptDialog> createState() => _ParentPinPromptDialogState();
-}
-
-class _ParentPinPromptDialogState extends State<_ParentPinPromptDialog> {
-  final TextEditingController _pinController = TextEditingController();
-
-  @override
-  void dispose() {
-    _pinController.dispose();
-    super.dispose();
-  }
-
-  void _submit([String? rawValue]) {
-    Navigator.of(context).pop(rawValue ?? _pinController.text);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Xác nhận phụ huynh'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(widget.reason),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _pinController,
-            autofocus: true,
-            keyboardType: TextInputType.number,
-            obscureText: true,
-            maxLength: 6,
-            decoration: const InputDecoration(
-              labelText: 'Nhập mã PIN phụ huynh',
-            ),
-            onSubmitted: _submit,
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Đóng'),
-        ),
-        FilledButton(
-          onPressed: () => _submit(),
-          child: const Text('Mở khóa'),
-        ),
-      ],
+    return PinAuthSheet.showVerify(
+      context,
+      expectedPin: expectedPin,
+      reason: reason,
     );
   }
 }

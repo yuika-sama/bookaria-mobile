@@ -374,6 +374,10 @@ void main() {
   testWidgets(
     'UnifiedReaderScreen prompts Parent PIN for preview under Kid Mode and executes lowercase model + setState fallback',
     (tester) async {
+      tester.view.physicalSize = const Size(800, 1000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
       SharedPreferences.setMockInitialValues({
         'bookaria.pref.kidMode': true,
         'bookaria.pref.kidPin': '1234',
@@ -406,23 +410,23 @@ void main() {
           ),
         ),
       );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
 
       // Parent PIN dialog shown because Kid Mode blocks Preview by default
-      expect(find.text('Xác nhận phụ huynh'), findsOneWidget);
+      expect(find.text('Xác nhận mã PIN'), findsOneWidget);
 
       // Dismiss without PIN -> locked view shown
-      await tester.tap(find.text('Đóng'));
+      await tester.tap(find.byIcon(Icons.close_rounded));
       await tester.pumpAndSettle();
       expect(find.text('Đã khóa bởi Chế độ Trẻ em'), findsOneWidget);
 
       // Retry with valid PIN -> loads stage & runs lowercase 'model' + 'setState'
       await tester.tap(find.text('Mở bằng mã PIN phụ huynh'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-      await tester.enterText(find.byType(TextField), '1234');
-      await tester.tap(find.text('Mở khóa'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('1'));
+      await tester.tap(find.text('2'));
+      await tester.tap(find.text('3'));
+      await tester.tap(find.text('4'));
       await tester.pumpAndSettle();
 
       expect(find.byIcon(Icons.view_in_ar_rounded), findsOneWidget);
@@ -465,47 +469,50 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Bật Chế độ Trẻ em'));
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField), '9999');
-      await tester.tap(find.text('Xác nhận'));
+      await tester.tap(find.text('9'));
+      await tester.tap(find.text('9'));
+      await tester.tap(find.text('9'));
+      await tester.tap(find.text('9'));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('Mã PIN không chính xác. Vui lòng thử lại!'), findsOneWidget);
+      await tester.tap(find.text('Hủy bỏ'));
       await tester.pumpAndSettle();
-      expect(find.text('Mã PIN không chính xác.'), findsOneWidget);
       expect(prefs.getBool('bookaria.pref.kidMode'), isTrue);
-      await tester.pump(const Duration(seconds: 5));
-      await tester.pumpAndSettle();
 
       // Valid PIN turns Kid Mode off
       await tester.tap(find.text('Bật Chế độ Trẻ em'));
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField), '0000');
-      await tester.tap(find.text('Xác nhận'));
-      await tester.pumpAndSettle();
+      await tester.tap(find.text('0'));
+      await tester.tap(find.text('0'));
+      await tester.tap(find.text('0'));
+      await tester.tap(find.text('0'));
+      await tester.pumpAndSettle(const Duration(milliseconds: 500));
       expect(prefs.getBool('bookaria.pref.kidMode'), isFalse);
 
-      // Change PIN: invalid short new PIN shows validation snackbar
+      // Change PIN: valid old (0000) -> new (2468) -> confirm (2468)
       await tester.ensureVisible(find.text('Đổi mã PIN phụ huynh'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Đổi mã PIN phụ huynh'));
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField).first, '0000');
-      await tester.enterText(find.byType(TextField).last, '12');
-      await tester.tap(find.text('Lưu PIN'));
-      await tester.pumpAndSettle();
-      expect(
-        find.text('PIN cũ không khớp hoặc PIN mới dưới 4 ký tự.'),
-        findsOneWidget,
-      );
-      expect(prefs.getString('bookaria.pref.kidPin'), '0000');
-      await tester.pump(const Duration(seconds: 5));
-      await tester.pumpAndSettle();
-
-      // Change PIN: valid old + new PIN persists updated PIN cleanly
-      await tester.tap(find.text('Đổi mã PIN phụ huynh'));
-      await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField).first, '0000');
-      await tester.enterText(find.byType(TextField).last, '2468');
-      await tester.tap(find.text('Lưu PIN'));
-      await tester.pumpAndSettle();
-      expect(find.text('Đã cập nhật mã PIN phụ huynh.'), findsOneWidget);
+      // Step 1: old PIN (0000)
+      await tester.tap(find.text('0'));
+      await tester.tap(find.text('0'));
+      await tester.tap(find.text('0'));
+      await tester.tap(find.text('0'));
+      await tester.pumpAndSettle(const Duration(milliseconds: 300));
+      // Step 2: new PIN (2468)
+      await tester.tap(find.text('2'));
+      await tester.tap(find.text('4'));
+      await tester.tap(find.text('6'));
+      await tester.tap(find.text('8'));
+      await tester.pumpAndSettle(const Duration(milliseconds: 300));
+      // Step 3: confirm new PIN (2468)
+      await tester.tap(find.text('2'));
+      await tester.tap(find.text('4'));
+      await tester.tap(find.text('6'));
+      await tester.tap(find.text('8'));
+      await tester.pumpAndSettle(const Duration(milliseconds: 500));
+      expect(find.text('Đã cập nhật mã PIN phụ huynh thành công.'), findsOneWidget);
       expect(prefs.getString('bookaria.pref.kidPin'), '2468');
     },
   );
@@ -539,25 +546,31 @@ void main() {
       // Cancel dialog
       await tester.tap(find.text('Mở PIN'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Đóng'));
+      await tester.tap(find.text('Hủy bỏ'));
       await tester.pumpAndSettle();
       expect(lastResult, isFalse);
 
       // Wrong PIN
       await tester.tap(find.text('Mở PIN'));
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField), '0000');
-      await tester.tap(find.text('Mở khóa'));
+      await tester.tap(find.text('0'));
+      await tester.tap(find.text('0'));
+      await tester.tap(find.text('0'));
+      await tester.tap(find.text('0'));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('Mã PIN không chính xác. Vui lòng thử lại!'), findsOneWidget);
+      await tester.tap(find.text('Hủy bỏ'));
       await tester.pumpAndSettle();
       expect(lastResult, isFalse);
-      expect(find.text('Mã PIN phụ huynh không chính xác.'), findsOneWidget);
 
-      // Correct PIN via keyboard submit
+      // Correct PIN
       await tester.tap(find.text('Mở PIN'));
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField), '4321');
-      await tester.testTextInput.receiveAction(TextInputAction.done);
-      await tester.pumpAndSettle();
+      await tester.tap(find.text('4'));
+      await tester.tap(find.text('3'));
+      await tester.tap(find.text('2'));
+      await tester.tap(find.text('1'));
+      await tester.pumpAndSettle(const Duration(milliseconds: 500));
       expect(lastResult, isTrue);
     },
   );
